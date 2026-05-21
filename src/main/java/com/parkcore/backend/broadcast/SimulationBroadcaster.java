@@ -1,8 +1,8 @@
 package com.parkcore.backend.broadcast;
 
-import com.parkcore.backend.dto.SimulationStateDTO;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+import java.util.Map;
 
 @Service
 public class SimulationBroadcaster {
@@ -14,13 +14,10 @@ public class SimulationBroadcaster {
     }
 
     /**
-     * Broadcast full simulation state to all WebSocket clients
+     * Broadcast full simulation state message to all WebSocket clients.
+     * Message format: { type: "STATE_UPDATE", payload: { vehicles, timestamp, vehicleCount, avgSpeed } }
      */
-    public void broadcast(SimulationStateDTO state) {
-
-        messaging.convertAndSend(
-            "/topic/simulation",
-            (Object) state
-        );
+    public void broadcast(Map<String, Object> message) {
+        messaging.convertAndSend("/topic/simulation", (Object) message);
     }
 }

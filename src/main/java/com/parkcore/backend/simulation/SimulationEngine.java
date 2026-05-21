@@ -1,10 +1,10 @@
 package com.parkcore.backend.simulation;
 
-import com.parkcore.backend.dto.SimulationStateDTO;
 import com.parkcore.backend.model.Vehicle;
 import com.parkcore.backend.broadcast.SimulationBroadcaster;
 import org.springframework.stereotype.Service;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class SimulationEngine {
@@ -29,21 +29,26 @@ public class SimulationEngine {
                     List<Vehicle> vehicles = generator.update();
                     
                     // 2. Calculate stats
-                    double avgSpeed = vehicles.stream()
-                        .mapToDouble(Vehicle::getSpeed)
-                        .average()
-                        .orElse(0.0);
+                    double totalSpeed = 0;
+                    for (Vehicle v : vehicles) {
+                        totalSpeed += v.getSpeed();
+                    }
+                    double avgSpeed = vehicles.isEmpty() ? 0 : totalSpeed / vehicles.size();
                     
-                    // 3. Create state DTO
-                    SimulationStateDTO state = new SimulationStateDTO(
-                        vehicles,
-                        System.currentTimeMillis(),
-                        vehicles.size(),
-                        avgSpeed
+                    // 3. Broadcast to all connected clients
+                    Map<String, Object> payload = Map.of(
+                        "vehicles", vehicles,
+                        "timestamp", System.currentTimeMillis(),
+                        "vehicleCount", vehicles.size(),
+                        "avgSpeed", avgSpeed
+                    );
+
+                    Map<String, Object> message = Map.of(
+                        "type", "STATE_UPDATE",
+                        "payload", payload
                     );
                     
-                    // 4. Broadcast to all connected clients
-                    broadcaster.broadcast(state);
+                    broadcaster.broadcast(message);
                     
                     // Sleep 50ms before next tick
                     Thread.sleep(50);
@@ -59,19 +64,5 @@ public class SimulationEngine {
 
     public void stop() {
         running = false;
-    }
-
-    public SimulationStateDTO getState() {
-        List<Vehicle> vehicles = generator.getVehicles();
-        double avgSpeed = vehicles.stream()
-            .mapToDouble(Vehicle::getSpeed)
-            .average()
-            .orElse(0.0);
-        return new SimulationStateDTO(
-            vehicles,
-            System.currentTimeMillis(),
-            vehicles.size(),
-            avgSpeed
-        );
     }
 }
