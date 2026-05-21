@@ -1,7 +1,7 @@
 package com.parkcore.backend.simulation;
 
 import com.parkcore.backend.model.Vehicle;
-import com.parkcore.backend.broadcast.SimulationBroadcaster;
+import com.parkcore.backend.websocket.RawWebSocketHandler;
 import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Map;
@@ -9,11 +9,11 @@ import java.util.Map;
 @Service
 public class SimulationEngine {
     private MockVehicleGenerator generator;
-    private SimulationBroadcaster broadcaster;
+    private RawWebSocketHandler wsHandler;
     private boolean running = false;
 
-    public SimulationEngine(SimulationBroadcaster broadcaster) {
-        this.broadcaster = broadcaster;
+    public SimulationEngine(RawWebSocketHandler wsHandler) {
+        this.wsHandler = wsHandler;
         this.generator = new MockVehicleGenerator();
     }
 
@@ -48,13 +48,16 @@ public class SimulationEngine {
                         "payload", payload
                     );
                     
-                    broadcaster.broadcast(message);
+                    wsHandler.broadcastToAll(message);
                     
                     // Sleep 50ms before next tick
                     Thread.sleep(50);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     break;
+                } catch (Exception e) {
+                    System.err.println("Error in simulation loop: " + e.getMessage());
+                    e.printStackTrace();
                 }
             }
         });
