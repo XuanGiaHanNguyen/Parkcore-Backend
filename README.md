@@ -1,100 +1,158 @@
-# ParkCore Backend: Parking Simulation Engine
+# Parking Simulation — Run Instructions
 
-> **Spring Boot engine that simulates a shopping-center parking lot and streams it live over WebSocket.**
+## Prerequisites
 
-This is the **backend** of ParkCore. The UI that draws the lot is in [Parkcore-Frontend](https://github.com/XuanGiaHanNguyen/Parkcore-Frontend).
+Make sure you have the following installed before running anything:
 
-## ⚡ What it does
+- **Java 21+** — [Download](https://adoptium.net/)
+- **Maven** — comes bundled as `mvnw` in the project, no install needed
+- **Node.js 18+** — [Download](https://nodejs.org/)
+- **npm** — comes with Node.js
 
-Every 50 ms the engine:
+---
 
-1. **Spawns arrivals** at the entrance, according to the traffic density.
-2. **Allocates a stall**: the free stall closest to the store, with a little randomness among the best few. Handicapped stalls are used only by permit holders.
-3. **Moves every vehicle** along its route: entrance lane → aisle → turn into the stall. Vehicles yield to traffic directly ahead. When two vehicles block each other, the one that arrived first goes, and a short timeout breaks any remaining deadlock.
-4. **Parks and releases**: parked cars stay for a while, wait for a gap in the aisle, back out, U-turn and exit. The stall is freed as soon as the car is back in the aisle.
-5. **Broadcasts** the full state to every connected client.
+## Project Structure
 
-Police cars patrol an aisle without parking. The lot starts about 40% full so there's something to watch right away.
+```
+parking-sim/
+├── parkingsim-backend/     ← Spring Boot (Java / Maven)
+└── parkingsim-frontend/    ← Next.js (TypeScript / Tailwind)
+```
 
-## 🛠️ Tech stack
+---
 
-Java 21 · Spring Boot 4 · Spring WebSocket (raw, no STOMP) · Jackson · Maven
+## 1. Backend (Spring Boot)
 
-## 🚀 Running locally
+### Setup
 
-Requires **JDK 21 or newer**.
+Ensure `src/main/resources/application.properties` contains:
+
+```properties
+server.port=8080
+```
+
+### Run
+
+Navigate to the backend folder:
+
+```bash
+cd parkingsim-backend
+```
+
+On Mac / Linux:
 
 ```bash
 ./mvnw spring-boot:run
 ```
 
-The server listens on **port 8085** by default (set `PORT` to change it). The WebSocket endpoint is:
-
-```
-ws://localhost:8085/ws/simulation
-```
-
-Then start the [frontend](https://github.com/XuanGiaHanNguyen/Parkcore-Frontend).
-
-### Build a jar / run tests
+On Windows:
 
 ```bash
-./mvnw package          # builds target/backend-0.0.1-SNAPSHOT.jar and runs tests
-java -jar target/backend-0.0.1-SNAPSHOT.jar
+mvnw.cmd spring-boot:run
 ```
 
-### Docker
+### Confirm it's running
+
+You should see this in the terminal:
+
+```
+Tomcat started on port(s): 8080
+Started ParkingSimApplication in 2.3 seconds
+```
+
+---
+
+## 2. Frontend (Next.js)
+
+### Setup
+
+Create a `.env.local` file in the frontend root if it doesn't exist:
 
 ```bash
-docker build -t parkcore-backend .
-docker run -p 8080:8080 parkcore-backend      # inside the container PORT=8080
+cd parkingsim-frontend
+touch .env.local
 ```
 
-## 📁 Code structure
+Add this line to `.env.local`:
 
 ```
-src/main/java/com/parkcore/backend/
-├── BackendApplication.java
-├── config/SimulationConfig.java          Starts the engine on boot
-├── model/
-│   ├── ParkingLot.java                   Lot geometry (mirrors the frontend canvas) and routes
-│   ├── ParkingSpot.java                  One stall: position, aisle, HC flag, reservation
-│   ├── Vehicle.java                      Vehicle state and route
-│   └── Waypoint.java                     Point on a route (drive / reverse / park)
-├── simulation/
-│   ├── SimulationEngine.java             Main loop: spawn, allocate, move, park, exit; controls
-│   ├── VehicleSpawner.java               Vehicle types, sizes, speeds
-│   └── logic/CollisionDetector.java      "Is anything in my path?" and right-of-way rules
-├── broadcast/SimulationBroadcaster.java  Wraps state as STATE_UPDATE and sends it
-├── dto/                                  JSON shapes sent to clients
-└── websocket/                            Raw WebSocket endpoint + control message handling
+NEXT_PUBLIC_WS_URL=ws://localhost:8080/ws/simulation
 ```
 
-`ParkingLot.java` uses the same constants as the frontend's `parkinglot.tsx` (canvas 1000 × 710). If you change the drawing, change both.
+Install dependencies (first time only):
 
-## 📡 WebSocket protocol
-
-Server → client, every tick:
-
-```json
-{ "type": "STATE_UPDATE",
-  "payload": { "vehicles": [ { "id": "vehicle-12", "type": "TAXI", "x": 512.4, "y": 161.5, "angle": 180,
-                               "speed": 90, "state": "MOVING", "spotId": "R1-4" } ],
-               "vehicleCount": 61, "parkedCount": 44, "totalSpots": 144, "spotsLeft": 89,
-               "servedCount": 120, "running": true, "speed": "normal", "density": "normal",
-               "avgSpeed": 71.2, "timestamp": 1761789012345 } }
+```bash
+npm install
 ```
 
-Vehicle `state` is one of `MOVING`, `STOPPED`, `PARKING`, `PARKED`, `EXITING`.
+### Run
 
-Client → server (all fields optional):
-
-```json
-{ "type": "CONTROL", "action": "play | pause | reset", "speed": "slow | normal | fast", "density": "sparse | normal | heavy" }
+```bash
+npm run dev
 ```
 
-## ☁️ Deploying
+You should see:
 
-The engine keeps a background thread and open WebSocket connections, so it needs an always-on host (Render, Railway, Fly.io, a VPS…), not serverless functions. Deploy with the included `Dockerfile`. The platform's `PORT` variable is picked up automatically. Point the frontend's `NEXT_PUBLIC_WS_URL` at `wss://<your-host>/ws/simulation`.
+```
+▲ Next.js 14.x.x
+- Local: http://localhost:3000
+```
 
-All clients share one simulation, so anyone pressing pause or reset affects everyone watching.
+Open your browser at [http://localhost:3000](http://localhost:3000).
+
+---
+
+## 3. Verify Everything Works
+
+| What to check | Where to look | Expected |
+|---|---|---|
+| Backend running | Terminal | `Tomcat started on port 8080` |
+| Frontend running | Terminal | `Local: http://localhost:3000` |
+| WebSocket connected | Canvas badge (top-right) | 🟢 `CONNECTED` |
+| Vehicles rendering | Canvas | Vehicles moving on the lot |
+| WS messages flowing | DevTools → Network → WS tab | Messages appearing in real time |
+
+---
+
+## 4. Checking WebSocket in DevTools
+
+1. Open `http://localhost:3000` in Chrome
+2. Open DevTools (`F12` or `Cmd+Opt+I`)
+3. Go to **Network** tab → filter by **WS**
+4. Click the `ws://localhost:8080/ws/simulation` entry
+5. Click the **Messages** tab — you should see JSON payloads arriving every ~100ms
+
+---
+
+## 5. Common Issues
+
+**Badge stays yellow (`CONNECTING`)**
+- Backend is not running — start it first before the frontend
+- Wrong port — confirm `application.properties` has `server.port=8080`
+- `.env.local` missing or has wrong URL
+
+**Vehicles not appearing on canvas**
+- WebSocket not connected (see above)
+- Backend is not broadcasting yet — make sure `SimulationBroadcaster.java` exists and `@EnableScheduling` is on your main class
+- Check browser console for errors
+
+**CORS error in browser console**
+- Add `.setAllowedOriginPatterns("*")` to your `WebSocketConfig.java` endpoint registration
+
+**Port 8080 already in use**
+```bash
+# Mac / Linux — find and kill the process
+lsof -i :8080
+kill -9 <PID>
+
+# Windows
+netstat -ano | findstr :8080
+taskkill /PID <PID> /F
+```
+
+---
+
+## 6. Stopping the App
+
+- **Backend:** `Ctrl + C` in the backend terminal
+- **Frontend:** `Ctrl + C` in the frontend terminal
